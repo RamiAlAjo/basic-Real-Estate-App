@@ -6,12 +6,11 @@ use Illuminate\Support\Str;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Attributes\Scope;
 
 class Property extends Model
 {
-    /** @use HasFactory<\Database\Factories\PropertyFactory> */
     use HasFactory;
 
     protected $fillable = [
@@ -50,19 +49,24 @@ class Property extends Model
     ];
 
     protected $casts = [
-        'features' => 'array',
-        'images' => 'array',
-        'furnished' => 'boolean',
-        'parking' => 'boolean',
-        'is_featured' => 'boolean',
-        'is_active' => 'boolean',
-        'featured_until' => 'datetime',
-        'price' => 'decimal:2',
-        'price_per_sqft' => 'decimal:2',
-        'latitude' => 'decimal:8',
-        'longitude' => 'decimal:8',
+        'features'        => 'array',
+        'images'          => 'array',
+        'furnished'       => 'boolean',
+        'parking'         => 'boolean',
+        'is_featured'     => 'boolean',
+        'is_active'       => 'boolean',
+        'featured_until'  => 'datetime',
+        'price'           => 'decimal:2',
+        'price_per_sqft'  => 'decimal:2',
+        'latitude'        => 'decimal:8',
+        'longitude'       => 'decimal:8',
     ];
 
+    /*
+    |--------------------------------------------------------------------------
+    | Boot
+    |--------------------------------------------------------------------------
+    */
     protected static function boot()
     {
         parent::boot();
@@ -80,18 +84,28 @@ class Property extends Model
         });
     }
 
-    // Route model binding by slug
+    /*
+    |--------------------------------------------------------------------------
+    | Route Model Binding
+    |--------------------------------------------------------------------------
+    */
     public function getRouteKeyName()
     {
         return 'slug';
     }
-    // scopes for fltering
+
+    /*
+    |--------------------------------------------------------------------------
+    | Scopes
+    |--------------------------------------------------------------------------
+    */
     #[Scope]
     public function available(Builder $query)
     {
         return $query->where('status', 'available')
-            ->where('is_active', true);
+                     ->where('is_active', true);
     }
+
     #[Scope]
     public function forSale(Builder $query)
     {
@@ -103,14 +117,15 @@ class Property extends Model
     {
         return $query->where('listing_type', 'rent');
     }
+
     #[Scope]
     public function featured(Builder $query)
     {
         return $query->where('is_featured', true)
-            ->where(function ($q) {
-                $q->whereNull('featured_until')
-                    ->orWhere('featured_until', '>', now());
-            });
+                     ->where(function ($q) {
+                         $q->whereNull('featured_until')
+                           ->orWhere('featured_until', '>', now());
+                     });
     }
 
     #[Scope]
@@ -137,63 +152,69 @@ class Property extends Model
         return $query->where('bedrooms', '>=', $bedrooms);
     }
 
-    //accessor methods
+    /*
+    |--------------------------------------------------------------------------
+    | Accessors
+    |--------------------------------------------------------------------------
+    */
     public function getFormattedPriceAttribute(): string
     {
-        return 'TZS ' . number_format($this->price, 0);
+        return 'JOD ' . number_format($this->price ?? 0, 0);
     }
 
     public function getFullAddressAttribute(): string
     {
-        return "{$this->address}, {$this->city}, {$this->state}, {$this->country}";
+        return trim("{$this->address}, {$this->city}, {$this->state}, {$this->country}", ', ');
     }
 
     public function getMainImageAttribute(): ?string
     {
-        $images = $this->images;
-        return $images && count($images) > 0 ? $images[0] : null;
+        return $this->images[0] ?? null;
     }
 
     public function getImageUrlAttribute(): ?string
     {
-        $mainImage = $this->main_image;
-        return $mainImage ? Storage::url($mainImage) : null;
+        return $this->main_image ? Storage::url($this->main_image) : null;
     }
 
     public function getStatusColorAttribute(): string
     {
         return match ($this->status) {
             'available' => 'success',
-            'sold' => 'danger',
-            'rented' => 'warning',
-            'pending' => 'info',
-            'draft' => 'secondary',
-            default => 'secondary'
+            'sold'      => 'danger',
+            'rented'    => 'warning',
+            'pending'   => 'info',
+            'draft'     => 'secondary',
+            default     => 'secondary',
         };
     }
 
     public function getTypeIconAttribute(): string
     {
         return match ($this->type) {
-            'house' => '🏠',
-            'apartment' => '🏢',
-            'condo' => '🏬',
-            'townhouse' => '🏘️',
-            'villa' => '🏡',
-            'land' => '🌍',
+            'house'      => '🏠',
+            'apartment'  => '🏢',
+            'condo'      => '🏬',
+            'townhouse'  => '🏘️',
+            'villa'      => '🏡',
+            'land'       => '🌍',
             'commercial' => '🏢',
-            default => '🏠'
+            default      => '🏠',
         };
     }
 
-    // Helper methods
+    /*
+    |--------------------------------------------------------------------------
+    | Helper Methods
+    |--------------------------------------------------------------------------
+    */
     public function isFeatured(): bool
     {
         if (!$this->is_featured) {
             return false;
         }
 
-        return !$this->featured_until || $this->featured_until->isFuture(); //more than now
+        return !$this->featured_until || $this->featured_until->isFuture();
     }
 
     public function isAvailable(): bool
@@ -203,15 +224,16 @@ class Property extends Model
 
     public function calculatePricePerSqft(): void
     {
-        if ($this->total_area && $this->total_area > 0) {
+        if ($this->total_area > 0) {
             $this->price_per_sqft = $this->price / $this->total_area;
             $this->save();
         }
     }
-    // gardens, pool, gym
+
     public function addFeature(string $feature): void
     {
         $features = $this->features ?? [];
+
         if (!in_array($feature, $features)) {
             $features[] = $feature;
             $this->features = $features;
@@ -222,6 +244,7 @@ class Property extends Model
     public function removeFeature(string $feature): void
     {
         $features = $this->features ?? [];
+
         $this->features = array_values(array_diff($features, [$feature]));
         $this->save();
     }
@@ -231,16 +254,20 @@ class Property extends Model
         return in_array($feature, $this->features ?? []);
     }
 
-    // Static methods for common queries
+    /*
+    |--------------------------------------------------------------------------
+    | Static Helpers
+    |--------------------------------------------------------------------------
+    */
     public static function getPropertyTypes(): array
     {
         return [
-            'house' => 'House',
-            'apartment' => 'Apartment',
-            'condo' => 'Condo',
-            'townhouse' => 'Townhouse',
-            'villa' => 'Villa',
-            'land' => 'Land',
+            'house'      => 'House',
+            'apartment'  => 'Apartment',
+            'condo'      => 'Condo',
+            'townhouse'  => 'Townhouse',
+            'villa'      => 'Villa',
+            'land'       => 'Land',
             'commercial' => 'Commercial',
         ];
     }
@@ -256,12 +283,11 @@ class Property extends Model
     public static function getStatuses(): array
     {
         return [
-            'draft' => 'Draft',
+            'draft'     => 'Draft',
             'available' => 'Available',
-            'pending' => 'Pending',
-            'sold' => 'Sold',
-            'rented' => 'Rented',
+            'pending'   => 'Pending',
+            'sold'      => 'Sold',
+            'rented'    => 'Rented',
         ];
     }
-
 }

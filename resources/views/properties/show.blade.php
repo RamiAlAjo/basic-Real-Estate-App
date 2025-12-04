@@ -41,7 +41,7 @@
                         <div class="flex items-center justify-between">
                             <div class="text-3xl font-bold text-green-600">{{ $property->formatted_price }}</div>
                             @if($property->price_per_sqft)
-                                <div class="text-lg text-gray-500 dark:text-gray-400">TZS
+                                <div class="text-lg text-gray-500 dark:text-gray-400">JOD
                                     {{ number_format($property->price_per_sqft, 0) }} per
                                     sqft</div>
                             @endif
